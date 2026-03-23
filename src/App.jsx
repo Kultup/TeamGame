@@ -1,9 +1,8 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import {
-  MessageCircle, Shuffle, Sparkles, RotateCcw, ChevronLeft,
-  UserPlus, Plus, Lock, X, Settings, LogOut, Volume2, VolumeX
+  Shuffle, Sparkles, ChevronLeft,
+  X, Settings, LogOut, Volume2, VolumeX, Info, RefreshCw
 } from 'lucide-react';
 
 // Components
@@ -13,6 +12,34 @@ import Notification, { useNotifications } from './components/Notification';
 import PlayerSetup from './components/PlayerSetup';
 import AdminPanel from './components/AdminPanel';
 import ExpandedCard from './components/ExpandedCard';
+import Rules from './components/Rules';
+
+const CountdownTimer = ({ expiresAt, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState(Math.max(0, expiresAt - Date.now()));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const newTime = Math.max(0, expiresAt - Date.now());
+      setTimeLeft(newTime);
+      if (newTime === 0) {
+        clearInterval(timer);
+        onExpire();
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt, onExpire]);
+
+  if (timeLeft === 0) return null;
+
+  const minutes = Math.floor(timeLeft / 1000 / 60);
+  const seconds = Math.floor((timeLeft / 1000) % 60);
+
+  return (
+    <span className="mod-timer">
+      ({minutes}:{seconds.toString().padStart(2, '0')})
+    </span>
+  );
+};
 
 // Constants
 import { getIconByName } from './constants/icons';
@@ -39,7 +66,8 @@ export default function App() {
   } = useNotifications();
   const lastErrorRef = useRef(null);
 
-  const [currentView, setCurrentView] = useState(() => localStorage.getItem('team_game_view') || 'players'); // 'players' | 'game' | 'admin'
+  const [currentView, setCurrentView] = useState(() => localStorage.getItem('team_game_view') || 'players'); // 'players' | 'game' | 'admin' | 'rules'
+  const [previousView, setPreviousView] = useState('players');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -58,12 +86,10 @@ export default function App() {
     addQuestion,
     updateQuestion,
     deleteQuestion,
-    refetch
   } = useGameData();
 
   const {
     selectedCategory,
-    flippedCards,
     expandedCard,
     gameQuestions,
     handleFlip,
@@ -71,13 +97,15 @@ export default function App() {
     handleReset,
     handleCategorySelect,
     handleRandomCard,
-    progress,
-    isCardFlipped
+    activeModifiers,
+    isCardFlipped,
+    clearModifiers,
+    removeModifier
   } = useGameLogic(questions);
 
   const { playerCount, currentPlayer, currentPlayerName, initializePlayers, nextPlayer, skipPlayers } = usePlayerManagement();
-  const { isMuted, toggleMute, playClickSound, playFlipSound, playWinSound } = useAudio();
-  const { isAuthenticated, showLogin, password, setPassword, error: authError, login, logout, openLogin, closeLogin } = useAdminAuth();
+  const { isMuted, toggleMute, playClickSound, playFlipSound } = useAudio();
+  const { isAuthenticated, showLogin, password, setPassword, error: authError, login, openLogin, closeLogin } = useAdminAuth();
 
   // Mouse Parallax Logic
   useEffect(() => {
@@ -260,6 +288,22 @@ export default function App() {
               </button>
             )}
 
+            <button
+              className={`glass icon-btn rules-toggle ${currentView === 'rules' ? 'active' : ''}`}
+              onClick={() => {
+                if (currentView !== 'rules') {
+                  setPreviousView(currentView);
+                  setCurrentView('rules');
+                } else {
+                  setCurrentView(previousView);
+                }
+                playInteraction();
+              }}
+              title="Правила гри"
+            >
+              <Info size={20} />
+            </button>
+
 
 
             <motion.button
@@ -279,6 +323,53 @@ export default function App() {
             </motion.button>
           </div>
         </header>
+
+        {activeModifiers.length > 0 && currentView === 'game' && (
+          <motion.div 
+            className="active-modifiers-banner glass"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+          >
+            <div className="modifiers-content">
+              <div className="modifiers-header">
+                <RefreshCw size={16} className="spin-slow" />
+                <span>Активні зміни курсу:</span>
+              </div>
+              <ul className="modifiers-list">
+                {activeModifiers.map((mod) => (
+                  <motion.li 
+                    key={mod.id}
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                  >
+                    <div className="mod-item">
+                      <span>{mod.text}</span>
+                      {mod.expiresAt && (
+                        <CountdownTimer 
+                          expiresAt={mod.expiresAt} 
+                          onExpire={() => removeModifier(mod.id)} 
+                        />
+                      )}
+                      <button 
+                        className="mod-remove-btn" 
+                        onClick={() => removeModifier(mod.id)}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+              <button 
+                className="clear-modifiers-btn" 
+                onClick={clearModifiers}
+                title="Скасувати всі зміни"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         <AnimatePresence mode="wait">
 
@@ -385,6 +476,13 @@ export default function App() {
               onDeleteQuestion={deleteQuestion}
               onBack={() => setCurrentView('players')}
               notify={{ error: notifyError, success: notifySuccess, info: notifyInfo }}
+            />
+          )}
+
+          {currentView === 'rules' && (
+            <Rules
+              key="rules"
+              onBack={() => setCurrentView(previousView)}
             />
           )}
         </AnimatePresence>

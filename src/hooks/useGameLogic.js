@@ -7,6 +7,10 @@ export function useGameLogic(questions) {
     return saved ? JSON.parse(saved) : [];
   });
   const [expandedCard, setExpandedCard] = useState(null);
+  const [activeModifiers, setActiveModifiers] = useState(() => {
+    const saved = localStorage.getItem('team_game_modifiers');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     if (selectedCategory) {
@@ -17,7 +21,8 @@ export function useGameLogic(questions) {
     }
     
     localStorage.setItem('team_game_flippedCards', JSON.stringify(flippedCards));
-  }, [selectedCategory, flippedCards]);
+    localStorage.setItem('team_game_modifiers', JSON.stringify(activeModifiers));
+  }, [selectedCategory, flippedCards, activeModifiers]);
 
   const gameQuestions = useMemo(() => {
     if (!selectedCategory) return [];
@@ -62,12 +67,33 @@ export function useGameLogic(questions) {
     });
     if (question) {
       setExpandedCard(question);
+      
+      // If the question is from 'change' category, add to active modifiers
+      if (question.category === 'change') {
+        setActiveModifiers(prev => {
+          if (prev.find(m => m.text === question.text)) return prev;
+          
+          let durationMs = null;
+          // Пряма перевірка на популярні часові інтервали
+          if (question.text.includes('5 хвилин')) durationMs = 5 * 60 * 1000;
+          else if (question.text.includes('1 хвилину')) durationMs = 1 * 60 * 1000;
+          else if (question.text.includes('30 секунд')) durationMs = 30 * 1000;
+
+          return [...prev, {
+            id: Date.now(),
+            text: question.text,
+            expiresAt: durationMs ? Date.now() + durationMs : null
+          }];
+        });
+      }
     }
   }, []);
 
   const handleReset = useCallback(() => {
     setFlippedCards([]);
+    setActiveModifiers([]);
     localStorage.removeItem('team_game_flippedCards');
+    localStorage.removeItem('team_game_modifiers');
   }, []);
 
   const progress = useMemo(() => {
@@ -91,6 +117,9 @@ export function useGameLogic(questions) {
     handleRandomCard: () => handleCategorySelect('random'),
     progress,
     allFlipped,
-    isCardFlipped
+    activeModifiers,
+    isCardFlipped,
+    clearModifiers: () => setActiveModifiers([]),
+    removeModifier: (id) => setActiveModifiers(prev => prev.filter(m => m.id !== id))
   };
 }

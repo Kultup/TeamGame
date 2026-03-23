@@ -116,6 +116,132 @@ h1 {
   font-weight: 400;
 }
 
+/* ── Active Modifiers Banner ── */
+.active-modifiers-banner {
+  width: 100%;
+  max-width: 900px;
+  margin: 0.5rem auto 1rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.modifiers-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.modifiers-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.modifiers-list {
+  flex: 1;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.modifiers-list li {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  color: #fff;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.mod-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem 0.35rem 0.8rem;
+}
+
+.mod-timer {
+  color: #fbbf24;
+  font-weight: 700;
+  font-family: monospace;
+  font-size: 0.95rem;
+  background: rgba(251, 191, 36, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.mod-remove-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-left: 0.2rem;
+}
+
+.mod-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.clear-modifiers-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.clear-modifiers-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.spin-slow {
+  animation: spin 8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .modifiers-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .clear-modifiers-btn {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.75rem;
+  }
+}
+
 /* ── Glass ── */
 .glass {
   background: var(--glass-bg);

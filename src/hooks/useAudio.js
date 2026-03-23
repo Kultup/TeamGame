@@ -27,7 +27,9 @@ export function useAudio() {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.15);
-    } catch (e) {}
+    } catch (e) {
+      // Audio context might be blocked or not supported
+    }
   }, [isMuted]);
 
   const playFlipSound = useCallback(() => {
@@ -48,7 +50,9 @@ export function useAudio() {
       
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
-    } catch (e) {}
+    } catch (e) {
+      // Audio context might be blocked or not supported
+    }
   }, [isMuted]);
 
   const playWinSound = useCallback(() => {
@@ -72,7 +76,9 @@ export function useAudio() {
       playNote(659.25, now + 0.1, 0.1); // E5
       playNote(783.99, now + 0.2, 0.1); // G5
       playNote(1046.50, now + 0.3, 0.3); // C6
-    } catch (e) {}
+    } catch (e) {
+      // Audio context might be blocked or not supported
+    }
   }, [isMuted]);
 
   return { isMuted, toggleMute, playClickSound, playFlipSound, playWinSound };
