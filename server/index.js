@@ -310,13 +310,23 @@ app.delete('/api/questions/:id', (req, res) => {
   });
 });
 
+// Serve static files from the 'dist' directory (Vite build)
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 404 handler
-app.use((req, res) => {
+// Wildcard route to serve index.html for any non-API route (for client-side routing)
+app.get('*', (req, res, next) => {
+  if (req.url.startsWith('/api/')) return next();
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// 404 handler for API
+app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
