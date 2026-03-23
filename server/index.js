@@ -319,15 +319,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Wildcard route to serve index.html for any non-API route (for client-side routing)
-app.get('(.*)', (req, res, next) => {
-  if (req.url.startsWith('/api/')) return next();
+// Final catch-all to serve index.html for any non-API route (client-side routing)
+app.use((req, res) => {
+  if (req.url.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
   res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// 404 handler for API
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Not found' });
 });
 
 // Error handler
