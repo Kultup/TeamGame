@@ -320,7 +320,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Wildcard route to serve index.html for any non-API route (for client-side routing)
-app.get('*', (req, res, next) => {
+app.get('(.*)', (req, res, next) => {
   if (req.url.startsWith('/api/')) return next();
   res.sendFile(path.join(distPath, 'index.html'));
 });
