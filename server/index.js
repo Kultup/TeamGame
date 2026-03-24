@@ -3,7 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import db from './db.js';
+import mongoose from 'mongoose';
+import Category from './models/Category.js';
+import Question from './models/Question.js';
 
 dotenv.config();
 
@@ -12,6 +14,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/teamgame';
+
+// MongoDB Connection
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // Security: Rate limiting simple implementation
 const rateLimitStore = new Map();
@@ -56,11 +64,7 @@ const sanitizeString = (str, maxLength = 500) => {
 };
 
 const isValidColor = (color) => {
-  return /^#[0-9A-Fa-f]{6}$/.test(color);
-};
-
-const isValidIcon = (icon, allowedIcons) => {
-  return allowedIcons.includes(icon);
+  return /^#[0-9A-Fa-f]{6,8}$/.test(color); // Allow #RRGGBBAA as well
 };
 
 const ALLOWED_ICONS = [
@@ -72,260 +76,252 @@ const ALLOWED_ICONS = [
   'Video', 'Coffee', 'Beer', 'Pizza', 'Briefcase', 'Camera', 'Cloud'
 ];
 
+const isValidIcon = (icon) => {
+  return ALLOWED_ICONS.includes(icon);
+};
+
 app.use(cors({
   origin: true,
   credentials: true
 }));
-app.use(express.json({ limit: '10kb' })); // Limit body size
+app.use(express.json({ limit: '10kb' })); 
 app.use(rateLimit);
 
-// Logger to debug requests on the server
+// Logger
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
+// Helper to format question response
+const formatQuestion = (q) => ({
+  id: q._id.toString(),
+  category: q.category,
+  text: q.text,
+  createdAt: q.createdAt,
+  updatedAt: q.updatedAt
+});
+
 // Get all categories
-app.get('/api/categories', (req, res) => {
-  db.all("SELECT * FROM categories", [], (err, rows) => {
-    if (err) {
-      console.error('DB Error:', err.message);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(rows || []);
-  });
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await Category.find({}).sort({ name: 1 });
+    res.json(categories);
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get all questions
-app.get('/api/questions', (req, res) => {
-  const { category } = req.query;
-  let query = "SELECT * FROM questions";
-  const params = [];
-
-  if (category && category !== 'all') {
-    query += " WHERE category = ?";
-    params.push(sanitizeString(category, 100));
-  }
-
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      console.error('DB Error:', err.message);
-      return res.status(500).json({ error: 'Database error' });
+app.get('/api/questions', async (req, res) => {
+  try {
+    const { category } = req.query;
+    const filter = {};
+    if (category && category !== 'all') {
+      filter.category = category;
     }
-    res.json(rows || []);
-  });
+    const questions = await Question.find(filter);
+    res.json(questions.map(formatQuestion));
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Add new question
-app.post('/api/questions', (req, res) => {
-  const { category, text } = req.body;
-  
-  // Validation
-  const sanitizedCategory = sanitizeString(category, 100);
-  const sanitizedText = sanitizeString(text, 1000);
-  
-  if (!sanitizedCategory || !sanitizedText) {
-    return res.status(400).json({ error: 'Category and text are required' });
-  }
-  
-  if (sanitizedText.length < 5) {
-    return res.status(400).json({ error: 'Question text must be at least 5 characters' });
-  }
-
-  db.run(
-    "INSERT INTO questions (category, text) VALUES (?, ?)",
-    [sanitizedCategory, sanitizedText],
-    function(err) {
-      if (err) {
-        console.error('DB Error:', err.message);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ id: this.lastID, category: sanitizedCategory, text: sanitizedText });
+app.post('/api/questions', async (req, res) => {
+  try {
+    const { category, text } = req.body;
+    const sanitizedCategory = sanitizeString(category, 100);
+    const sanitizedText = sanitizeString(text, 2000);
+    
+    if (!sanitizedCategory || !sanitizedText) {
+      return res.status(400).json({ error: 'Category and text are required' });
     }
-  );
+    
+    if (sanitizedText.length < 5) {
+      return res.status(400).json({ error: 'Question text must be at least 5 characters' });
+    }
+
+    const question = await Question.create({
+      category: sanitizedCategory,
+      text: sanitizedText
+    });
+    
+    res.json(formatQuestion(question));
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Update question
-app.put('/api/questions/:id', (req, res) => {
-  const { id } = req.params;
-  const { category, text } = req.body;
-  const parsedId = parseInt(id, 10);
+app.put('/api/questions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category, text } = req.body;
 
-  if (isNaN(parsedId)) {
-    return res.status(400).json({ error: 'Invalid question ID' });
-  }
+    const sanitizedCategory = sanitizeString(category, 100);
+    const sanitizedText = sanitizeString(text, 2000);
 
-  const sanitizedCategory = sanitizeString(category, 100);
-  const sanitizedText = sanitizeString(text, 1000);
-
-  if (!sanitizedCategory || !sanitizedText) {
-    return res.status(400).json({ error: 'Category and text are required' });
-  }
-
-  db.run(
-    "UPDATE questions SET category = ?, text = ? WHERE id = ?",
-    [sanitizedCategory, sanitizedText, parsedId],
-    function(err) {
-      if (err) {
-        console.error('DB Error:', err.message);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Question not found' });
-      }
-      res.json({ id: parsedId, category: sanitizedCategory, text: sanitizedText });
+    if (!sanitizedCategory || !sanitizedText) {
+      return res.status(400).json({ error: 'Category and text are required' });
     }
-  );
+
+    const question = await Question.findByIdAndUpdate(
+      id,
+      { category: sanitizedCategory, text: sanitizedText },
+      { new: true }
+    );
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+    
+    res.json(formatQuestion(question));
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Add new category
-app.post('/api/categories', (req, res) => {
-  const { id, name, color, icon, isSpecial } = req.body;
+app.post('/api/categories', async (req, res) => {
+  try {
+    const { id, name, color, icon, isSpecial } = req.body;
 
-  // Validation
-  let sanitizedId = sanitizeString(id, 100);
-  const sanitizedName = sanitizeString(name, 100);
-  const sanitizedColor = sanitizeString(color, 20);
-  const sanitizedIcon = sanitizeString(icon, 50);
+    let sanitizedId = sanitizeString(id, 100);
+    const sanitizedName = sanitizeString(name, 100);
+    const sanitizedColor = sanitizeString(color, 20);
+    const sanitizedIcon = sanitizeString(icon, 50);
 
-  if (!sanitizedName || !sanitizedColor || !sanitizedIcon) {
-    return res.status(400).json({ error: 'Name, color, and icon are required' });
-  }
+    if (!sanitizedName || !sanitizedColor || !sanitizedIcon) {
+      return res.status(400).json({ error: 'Name, color, and icon are required' });
+    }
 
-  if (!sanitizedId) {
-    sanitizedId = sanitizedName.toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
+    if (!sanitizedId) {
+      sanitizedId = sanitizedName.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+    }
+
+    if (!isValidColor(sanitizedColor)) {
+      return res.status(400).json({ error: 'Invalid color format' });
+    }
+
+    if (!isValidIcon(sanitizedIcon)) {
+      return res.status(400).json({ error: 'Invalid icon name' });
+    }
+
+    const category = await Category.create({
+      id: sanitizedId,
+      name: sanitizedName,
+      color: sanitizedColor,
+      icon: sanitizedIcon,
+      isSpecial: isSpecial ? 1 : 0
+    });
     
-    if (!sanitizedId || sanitizedId === '-') {
-      sanitizedId = 'cat-' + Date.now().toString(36);
+    res.json(category);
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Category with this ID already exists' });
     }
+    res.status(500).json({ error: 'Database error' });
   }
-
-  if (!isValidColor(sanitizedColor)) {
-    return res.status(400).json({ error: 'Invalid color format. Use hex format: #RRGGBB' });
-  }
-
-  if (!isValidIcon(sanitizedIcon, ALLOWED_ICONS)) {
-    return res.status(400).json({ error: 'Invalid icon name' });
-  }
-
-  // console.log('Creating category:', { id: sanitizedId, name: sanitizedName, color: sanitizedColor, icon: sanitizedIcon });
-
-  db.run(
-    "INSERT INTO categories (id, name, color, icon, isSpecial) VALUES (?, ?, ?, ?, ?)",
-    [sanitizedId, sanitizedName, sanitizedColor, sanitizedIcon, isSpecial ? 1 : 0],
-    function(err) {
-      if (err) {
-        console.error('DB Error:', err.message);
-        if (err.message.includes('UNIQUE')) {
-          return res.status(409).json({ error: 'Category with this ID already exists' });
-        }
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ id: sanitizedId, name: sanitizedName, color: sanitizedColor, icon: sanitizedIcon, isSpecial: isSpecial ? 1 : 0 });
-    }
-  );
 });
 
 // Update category
-app.put('/api/categories/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, color, icon, isSpecial } = req.body;
-  const sanitizedId = sanitizeString(id, 100);
+app.put('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, color, icon, isSpecial } = req.body;
 
-  const sanitizedName = sanitizeString(name, 100);
-  const sanitizedColor = sanitizeString(color, 20);
-  const sanitizedIcon = sanitizeString(icon, 50);
+    const sanitizedName = sanitizeString(name, 100);
+    const sanitizedColor = sanitizeString(color, 20);
+    const sanitizedIcon = sanitizeString(icon, 50);
 
-  if (!sanitizedName || !sanitizedColor || !sanitizedIcon) {
-    return res.status(400).json({ error: 'Name, color, and icon are required' });
-  }
-
-  if (!isValidColor(sanitizedColor)) {
-    return res.status(400).json({ error: 'Invalid color format' });
-  }
-
-  if (!isValidIcon(sanitizedIcon, ALLOWED_ICONS)) {
-    return res.status(400).json({ error: 'Invalid icon name' });
-  }
-
-  db.run(
-    "UPDATE categories SET name = ?, color = ?, icon = ?, isSpecial = ? WHERE id = ?",
-    [sanitizedName, sanitizedColor, sanitizedIcon, isSpecial ? 1 : 0, sanitizedId],
-    function(err) {
-      if (err) {
-        console.error('DB Error:', err.message);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Category not found' });
-      }
-      res.json({ id: sanitizedId, name: sanitizedName, color: sanitizedColor, icon: sanitizedIcon, isSpecial: isSpecial ? 1 : 0 });
+    if (!sanitizedName || !sanitizedColor || !sanitizedIcon) {
+      return res.status(400).json({ error: 'Name, color, and icon are required' });
     }
-  );
+
+    if (!isValidColor(sanitizedColor)) {
+      return res.status(400).json({ error: 'Invalid color format' });
+    }
+
+    if (!isValidIcon(sanitizedIcon)) {
+      return res.status(400).json({ error: 'Invalid icon name' });
+    }
+
+    const category = await Category.findOneAndUpdate(
+      { id },
+      { name: sanitizedName, color: sanitizedColor, icon: sanitizedIcon, isSpecial: isSpecial ? 1 : 0 },
+      { new: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    res.json(category);
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Delete category (and its questions)
-app.delete('/api/categories/:id', (req, res) => {
-  const { id } = req.params;
-  const sanitizedId = sanitizeString(id, 100);
-
-  if (!sanitizedId) {
-    return res.status(400).json({ error: 'Invalid category ID' });
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Delete all questions in this category
+    await Question.deleteMany({ category: id });
+    
+    // Delete the category itself
+    const result = await Category.deleteOne({ id });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    
+    res.json({ success: true, deletedId: id });
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
   }
-
-  // console.log(`Deleting category: ${sanitizedId}`);
-
-  db.serialize(() => {
-    db.run("DELETE FROM questions WHERE category = ?", [sanitizedId], (err) => {
-      if (err) console.error('Error deleting questions:', err.message);
-    });
-    db.run("DELETE FROM categories WHERE id = ?", [sanitizedId], function(err) {
-      if (err) {
-        console.error('Error deleting category:', err.message);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Category not found' });
-      }
-      // console.log(`Successfully deleted category: ${sanitizedId}. Rows affected: ${this.changes}`);
-      res.json({ success: true, deletedId: sanitizedId });
-    });
-  });
 });
 
 // Delete question
-app.delete('/api/questions/:id', (req, res) => {
-  const { id } = req.params;
-  const parsedId = parseInt(id, 10);
-  
-  if (isNaN(parsedId)) {
-    return res.status(400).json({ error: 'Invalid question ID' });
-  }
-  
-  db.run("DELETE FROM questions WHERE id = ?", [parsedId], function(err) {
-    if (err) {
-      console.error('DB Error:', err.message);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    if (this.changes === 0) {
+app.delete('/api/questions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await Question.findByIdAndDelete(id);
+    if (!result) {
       return res.status(404).json({ error: 'Question not found' });
     }
-    res.json({ success: true, deletedId: parsedId });
+    res.json({ success: true, deletedId: id });
+  } catch (err) {
+    console.error('DB Error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
-// Serve static files from the 'dist' directory (Vite build)
+// Serve static
 const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Final catch-all to serve index.html for any non-API route (client-side routing)
+// Catch-all
 app.use((req, res) => {
   if (req.url.startsWith('/api/')) {
     return res.status(404).json({ error: 'API route not found' });
@@ -333,13 +329,12 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// Error handler
+// Error handling
 app.use((err, req, res, _next) => {
-  // console.error('Unhandled error:', err);
+  console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${PORT}`);
-  console.log(`Health check: http://0.0.0.0:${PORT}/api/health`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
