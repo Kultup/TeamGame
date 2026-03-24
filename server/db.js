@@ -65,6 +65,24 @@ const db = {
         const newCat = { id: params[0], name: params[1], color: params[2], icon: params[3], isSpecial: params[4] };
         state.categories.push(newCat);
         if (callback) callback.call({ lastID: newCat.id }, null);
+      } else if (query.includes('UPDATE questions')) {
+        const [category, text, id] = params;
+        const index = state.questions.findIndex(q => q.id === id);
+        if (index !== -1) {
+          state.questions[index] = { ...state.questions[index], category, text };
+          if (callback) callback.call({ changes: 1 }, null);
+        } else {
+          if (callback) callback.call({ changes: 0 }, null);
+        }
+      } else if (query.includes('UPDATE categories')) {
+        const [name, color, icon, isSpecial, id] = params;
+        const index = state.categories.findIndex(c => c.id === id);
+        if (index !== -1) {
+          state.categories[index] = { ...state.categories[index], name, color, icon, isSpecial };
+          if (callback) callback.call({ changes: 1 }, null);
+        } else {
+          if (callback) callback.call({ changes: 0 }, null);
+        }
       } else if (query.includes('DELETE FROM questions WHERE id = ?')) {
         state.questions = state.questions.filter(q => q.id !== params[0]);
         if (callback) callback.call({ changes: 1 }, null);
