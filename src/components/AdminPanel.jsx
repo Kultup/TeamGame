@@ -104,7 +104,7 @@ const AdminPanel = React.memo(({
     try {
       const result = await onAddQuestion(newQuestion);
       if (result) {
-        setNewQuestion({ text: '', category: '' });
+        setNewQuestion(prev => ({ ...prev, text: '' }));
         setEditorError(null);
         notify.success('Питання додано');
       }
