@@ -79,7 +79,13 @@ export default function ExpandedCard({
           </motion.div>
           
           <motion.h2 
-            className="expanded-text"
+            className={`expanded-text ${
+              question.text.length > 1000 ? 'text-micro' :
+              question.text.length > 700 ? 'text-tiny' :
+              question.text.length > 500 ? 'text-compact' :
+              question.text.length > 250 ? 'text-xl' : 
+              question.text.length > 120 ? 'text-long' : ''
+            }`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}

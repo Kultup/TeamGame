@@ -9,6 +9,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg-color);
@@ -74,7 +79,8 @@ body {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  overflow: hidden; /* Prevent global scroll */
+  overflow-x: hidden;
+  overflow-y: auto; /* Allow scrolling if content tall */
 }
 
 .main-content {
@@ -557,23 +563,38 @@ h1 {
 /* ── Card ── */
 .card-container {
   width: 100%;
-  height: 280px;
+  aspect-ratio: 4/5;
+  max-height: 380px;
   position: relative;
-  perspective: 1500px;
+  perspective: 2000px;
+}
+
+.card-flipper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d;
+}
+
+.card-container.is-flipped .card-flipper {
+  transform: rotateY(180deg);
 }
 
 .card-face {
+  position: absolute;
   width: 100%;
   height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   border-radius: 2rem;
   overflow: hidden;
-  position: relative;
-  transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
 }
 
 .card-face::before {
@@ -604,11 +625,48 @@ h1 {
   backdrop-filter: blur(10px);
 }
 
-.card-revealed {
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.5), 
-              0 0 30px var(--accent-glow, rgba(59, 130, 246, 0.2));
-  opacity: 0.8;
+.card-back {
+  transform: rotateY(180deg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-back-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow-y: auto; /* Allow internal scroll if truly massive */
+  width: 100%;
+  padding: 0.5rem 0;
+}
+
+.card-question {
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  margin: 0;
+  width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.card-question.q-small { font-size: 0.9rem; }
+.card-question.q-mini { font-size: 0.75rem; }
+.card-question.q-extra-mini { font-size: 0.65rem; line-height: 1.2; }
+.card-question.text-tiny { font-size: 0.65rem; line-height: 1.2; }
+.card-question.text-micro { font-size: 0.6rem; line-height: 1.1; }
+
+.card-back-footer {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  margin-top: 1rem;
 }
 
 .card-number {
@@ -655,7 +713,8 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow-y: auto; /* Enable scrolling for tall content */
+  padding: 1rem;
 }
 .expanded-content {
   display: flex;
@@ -664,7 +723,10 @@ h1 {
   gap: 1.5rem;
   z-index: 2;
   max-width: 650px;
-  padding: 2rem;
+  padding: 4rem 1.5rem 2rem;
+  min-height: min-content;
+  max-height: 100%; /* Ensure it doesn't exceed overlay */
+  overflow-y: auto; /* Scroll if content exceeds overlay */
 }
 .expanded-close {
   position: fixed;
@@ -699,6 +761,27 @@ h1 {
   font-weight: 700;
   color: #fff;
   max-width: 800px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word; /* Better for natural languages */
+  line-break: anywhere; /* Force break anywhere for giant strings */
+}
+
+/* Dynamic Font Scaling */
+.text-long { font-size: 2rem; }
+.text-xl { font-size: 1.6rem; }
+.text-compact { font-size: 1.2rem; }
+.text-tiny { font-size: 1rem; }
+.text-micro { font-size: 0.8rem; }
+.text-huge { font-size: 0.7rem; } /* For cards strictly */
+
+@media (max-width: 640px) {
+  .expanded-text { font-size: 1.5rem; }
+  .text-long { font-size: 1.25rem; }
+  .text-xl { font-size: 1.1rem; }
+  .text-compact { font-size: 0.9rem; }
+  .text-tiny { font-size: 0.75rem; }
+  .text-micro { font-size: 0.65rem; }
 }
 .expanded-footer {
   display: flex;
@@ -756,10 +839,12 @@ h1 {
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
-  h1 { font-size: 1.8rem; }
-  .expanded-text { font-size: 1.3rem; }
-  .expanded-close { top: 1rem; right: 1rem; }
-  .player-grid { grid-template-columns: repeat(4, 1fr); }
+  h1 { font-size: 1.6rem; }
+  .expanded-text { font-size: 1.4rem; }
+  .expanded-close { top: 0.75rem; right: 0.75rem; width: 40px; height: 40px; }
+  .player-grid { grid-template-columns: repeat(3, 1fr); }
+  .random-text { display: none; } /* Hide text on mobile, keep icon */
+  .magic-btn { padding: 8px !important; }
 }
 
 .main-header {
@@ -938,9 +1023,9 @@ h1 {
 .admin-container {
   width: 100%;
   max-width: 1300px;
-  max-height: 90vh;
+  max-height: 95vh;
   margin: auto;
-  padding: 2.5rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 2rem;
@@ -955,6 +1040,8 @@ h1 {
   align-items: center;
   border-bottom: 2px solid rgba(255, 255, 255, 0.05);
   padding-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .admin-header h2 { margin: 0; font-size: 1.8rem; font-weight: 700; background: linear-gradient(to right, #fff, rgba(255,255,255,0.7)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
@@ -1110,6 +1197,25 @@ h1 {
   background: rgba(255, 255, 255, 0.08) !important;
   outline: none;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.admin-preview-section {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.preview-card-wrapper {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 4/5;
+  margin: 0 auto;
+}
+
+.preview-card-wrapper .card-face {
+  position: relative !important;
+  backface-visibility: visible !important;
 }
 
 .editor-list {
@@ -1461,17 +1567,16 @@ h1 {
 }
 
 @media (max-width: 480px) {
-  .player-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  .color-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  
-  .icon-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  .player-grid { grid-template-columns: repeat(2, 1fr); }
+  .color-grid { grid-template-columns: repeat(4, 1fr); }
+  .icon-grid { grid-template-columns: repeat(4, 1fr); }
+  .admin-header h2 { font-size: 1.4rem; }
+  .admin-tab { padding: 0.6rem 1rem; font-size: 0.85rem; }
+  .card-container { aspect-ratio: 1; max-height: 250px; }
+  .card-face { border-radius: 1.5rem; }
+  .card-question { font-size: 0.9rem; }
+  .card-question.q-small { font-size: 0.75rem; }
+  .card-question.q-mini { font-size: 0.65rem; }
 }
 
 /* ── Modern UI Enhancements ── */

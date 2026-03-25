@@ -28,8 +28,8 @@ const Card = React.memo(React.forwardRef(({ question, category, isFlipped, onFli
   return (
     <motion.div
       ref={ref}
-      className="card-container"
-      onClick={() => !isFlipped && onFlip(question.id)}
+      className={`card-container ${isFlipped ? 'is-flipped' : ''}`}
+      onClick={() => !isFlipped && onFlip(question.id, question)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       initial={{ opacity: 0, y: 30 }}
@@ -46,22 +46,43 @@ const Card = React.memo(React.forwardRef(({ question, category, isFlipped, onFli
       whileHover={!isFlipped ? { scale: 1.05 } : {}}
       whileTap={!isFlipped ? { scale: 0.95 } : {}}
     >
-      <div
-        className={`card-face card-front glass ${isFlipped ? 'card-revealed' : ''}`}
-        style={{
-          background: `linear-gradient(135deg, ${category?.color || '#3b82f6'}33, ${category?.color || '#3b82f6'}11)`,
-          borderColor: `${category?.color || '#3b82f6'}66`
-        }}
-      >
-        <div className="card-number">#{index + 1}</div>
-        <div className="card-shine" />
-        <Icon size={48} color={category?.color || '#3b82f6'} strokeWidth={1.5} />
-        <span className="card-label">{category?.name || 'Категорія'}</span>
-        {!isFlipped && (
-          <span className="card-mini-text">
-            Натисніть, щоб відкрити
-          </span>
-        )}
+      <div className="card-flipper">
+        <div
+          className="card-face card-front glass"
+          style={{
+            background: `linear-gradient(135deg, ${category?.color || '#3b82f6'}33, ${category?.color || '#3b82f6'}11)`,
+            borderColor: `${category?.color || '#3b82f6'}66`
+          }}
+        >
+          <div className="card-number">#{index + 1}</div>
+          <div className="card-shine" />
+          <Icon size={48} color={category?.color || '#3b82f6'} strokeWidth={1.5} />
+          <span className="card-label">{category?.name || 'Категорія'}</span>
+          <span className="card-mini-text">Натисніть, щоб відкрити</span>
+        </div>
+
+        <div
+          className="card-face card-back glass"
+          style={{
+            borderColor: `${category?.color || '#3b82f6'}88`,
+            background: `linear-gradient(135deg, #0f172a, ${category?.color}22)`
+          }}
+        >
+          <div className="card-back-content">
+            <p className={`card-question ${
+              question.text.length > 1000 ? 'text-micro' :
+              question.text.length > 700 ? 'text-tiny' :
+              question.text.length > 400 ? 'q-extra-mini' :
+              question.text.length > 250 ? 'q-mini' : 
+              question.text.length > 120 ? 'q-small' : ''
+            }`}>
+              {question.text}
+            </p>
+          </div>
+          <div className="card-back-footer" style={{ color: category?.color }}>
+            {category?.name}
+          </div>
+        </div>
       </div>
     </motion.div>
   );

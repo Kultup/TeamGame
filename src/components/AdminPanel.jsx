@@ -31,6 +31,44 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onClose }) => (
   </AnimatePresence>
 );
 
+const QuestionPreview = ({ text, category }) => {
+  if (!text && !category) return null;
+  return (
+    <div className="admin-preview-section">
+      <label>Попередній перегляд на картці</label>
+      <div className="preview-card-wrapper">
+        <div 
+          className="card-face card-back glass" 
+          style={{ 
+            borderColor: `${category?.color || '#3b82f6'}88`,
+            background: `linear-gradient(135deg, #0f172a, ${category?.color || '#3b82f6'}22)`,
+            position: 'relative',
+            transform: 'none',
+            width: '100%',
+            height: '100%',
+            minHeight: '200px'
+          }}
+        >
+          <div className="card-back-content">
+            <p className={`card-question ${
+              text.length > 1000 ? 'text-micro' :
+              text.length > 700 ? 'text-tiny' :
+              text.length > 400 ? 'q-extra-mini' :
+              text.length > 250 ? 'q-mini' : 
+              text.length > 120 ? 'q-small' : ''
+            }`}>
+              {text || 'Текст питання з\'явиться тут...'}
+            </p>
+          </div>
+          <div className="card-back-footer" style={{ color: category?.color }}>
+            {category?.name || 'Категорія'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = React.memo(({ 
   categories, 
   questions, 
@@ -352,6 +390,12 @@ const AdminPanel = React.memo(({
                       minLength={5}
                       maxLength={1000}
                     />
+                    
+                    <QuestionPreview 
+                      text={editingItem ? editingItem.data.text : newQuestion.text}
+                      category={categories.find(c => c.id === (editingItem ? editingItem.data.category : newQuestion.category))}
+                    />
+
                     {editingItem ? (
                       <div style={{ display: 'flex', gap: '1rem' }}>
                         <button className="glass submit-btn" style={{ flex: 1 }} onClick={handleUpdateQuestion}>
